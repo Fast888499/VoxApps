@@ -22,13 +22,14 @@ fun LanguageSelectionScreen(
 
     onLanguageSelected: (String) -> Unit
 ) {
-        val languageManager = LocalLanguageManager.current
+    val languageManager = LocalLanguageManager.current
     val availableLanguages = remember { languageManager.getAvailableLanguages() }
     val languageNames = mapOf(
         "en" to "English",
         "de" to "Deutsch",
         "fr" to "Français",
-        "ro" to "Română"
+        "ro" to "Română",
+        "uz" to "O‘zbekcha"
     )
 
     Surface(
@@ -51,7 +52,7 @@ fun LanguageSelectionScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Select your language / Wählen Sie Ihre Sprache / Sélectionnez votre langue / Selectați limba",
+                text = "Tilingizni tanlang / Select your language / Wählen Sie Ihre Sprache / Sélectionnez votre langue / Selectați limba",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
