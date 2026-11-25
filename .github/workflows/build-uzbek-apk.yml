@@ -1,0 +1,77 @@
+name: Build Uzbek Debug APKs
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-uzbek-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    env:
+      GRADLE_HEAP: -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
+      CMAKE_VERSION: 3.22.1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve the pinned NDK
+        run: echo "NDK_VERSION=$(grep -m1 '^ndk = ' gradle/libs.versions.toml | sed 's/.*"\(.*\)".*/\1/')" >> "$GITHUB_ENV"
+
+      - name: Resolve the pinned OpenCV commit
+        id: opencv_pin
+        run: echo "sha=$(git ls-tree HEAD vendor/opencv | awk '{print $3}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore built OpenCV
+        id: opencv_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            vendor/ppocr-sdk/opencv
+            vox-vision/src/main/jniLibs
+          key: opencv-${{ runner.os }}-ndk${{ env.NDK_VERSION }}-${{ steps.opencv_pin.outputs.sha }}-${{ hashFiles('scripts/build_opencv_android.sh') }}
+
+      - name: Fetch OpenCV sources
+        if: steps.opencv_cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --depth 1 vendor/opencv
+
+      - name: Set up Android SDK
+        if: steps.opencv_cache.outputs.cache-hit != 'true'
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-licenses: true
+
+      - name: Install NDK and CMake
+        if: steps.opencv_cache.outputs.cache-hit != 'true'
+        run: sdkmanager --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+
+      - name: Assemble every app
+        run: ./gradlew assembleDebug --no-daemon -PvoxSkipNativePrep "$GRADLE_HEAP"
+
+      - name: Save built OpenCV
+        if: always() && steps.opencv_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            vendor/ppocr-sdk/opencv
+            vox-vision/src/main/jniLibs
+          key: ${{ steps.opencv_cache.outputs.cache-primary-key }}
+
+      - name: Upload Debug APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: vox-uzbek-debug-apks
+          path: '**/build/outputs/apk/debug/*.apk'
+          retention-days: 14
